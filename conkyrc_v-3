@@ -1,0 +1,112 @@
+ 
+
+# Variant elegant conky 2017
+# Belyakov Igor aka Old Hank
+background yes
+use_xft yes
+xftfont arial:size=9 #было перед имя шрифта-123
+xftalpha 0.1
+update_interval 1
+total_run_times 0
+own_window yes
+own_window_type normal
+#own_window_transparent yes
+own_window_argb_visual yes
+own_window_argb_value 80 # степень прозрачности от 0 до 250 полная не прозначность
+own_window_hints undecorated,below,sticky,skip_taskbar,skip_pager
+double_buffer yes
+minimum_size 240
+maximum_width 300
+draw_shades no
+draw_outline no
+draw_borders no
+draw_graph_borders yes
+default_color gray
+default_shade_color red
+default_outline_color green
+alignment top_right
+gap_x 10
+gap_y 10
+#no_buffers no # если раскоментировать строку на 20 процентов больше загрузки оперативки-----
+uppercase no
+cpu_avg_samples 2
+net_avg_samples 1
+override_utf8_locale yes
+use_spacer yes
+text_buffer_size 256
+
+TEXT
+
+${font Capture it:size=18}${alignc}${color b0c4de} MANJARO LINUX ${font openlogos:size=20}
+${voffset -68}
+${color DimGray}
+${color DimGray} ${stippled_hr 2}
+#=====================================section SYSTEM INFO ===========================================
+${font Arial:bold:size=10}${color Tan1}SYSTEM ${color DarkSlateGray} ${hr 2}
+$font${color 778899}$sysname $kernel $alignr $machine
+Intel Pentium D $alignr${freq_g cpu0}Ghz
+Uptime $alignr${uptime}
+File System $alignr${fs_type}
+${color DimGray} ${stippled_hr 2}
+#================================ Section Processors ========================================
+${font Arial:bold:size=10}${color Tan1}PROCESSORS ${color DarkSlateGray}${hr 2}
+$font${color 778899}CPU 1  ${cpu cpu1}% ${cpubar 5.8 cpu1}
+CPU 2  ${cpu cpu2}% ${cpubar 5.8 cpu2}
+ ${cpugraph cpu0 23,120 000000 778899} ${cpugraph cpu1 23,120 000000 778899}
+${color DimGray} ${stippled_hr 2}
+#================================= Section Memory ===========================================
+${font Arial:bold:size=10}${color Tan1}MEMORY ${color DarkSlateGray}${hr 2}
+$font${color 778899}MEM $alignc $mem / $memmax $alignr $memperc%
+${color 778899} ${memperc}% ${membar 4}
+$font${color 778899}SWAP $alignc $swap / $swapmax $alignr $swapperc%
+${color 778899} ${swapperc}%   ${swapbar 5}
+${color DimGray} ${stippled_hr 2}
+#================================ Section HHD Drive =========================================
+${font Arial:bold:size=10}${color Tan1}HDD ${color DarkSlateGray}${hr 2}
+$font${color 778899}Root $alignc ${fs_used /} / ${fs_size /} $alignr ${fs_free_perc /}%
+${fs_bar 4 /}
+$font${color 778899}Home $alignc ${fs_used /home} / ${fs_size /home} $alignr ${fs_free_perc /home}%
+${fs_bar 4 /home}
+Backup $alignc ${fs_used /run/media/hank/DAN/} / ${fs_size /run/media/hank/DAN/} $alignr ${fs_free_perc /run/media/hank/DAN/}%
+${fs_bar 4 /run/media/hank/DAN/}
+Win-7 $alignc ${fs_used /run/media/hank/98FEB92FFEB90692/} / ${fs_size /run/media/hank/98FEB92FFEB90692/} $alignr ${fs_free_perc /run/media/hank/98FEB92FFEB90692/}%
+${fs_bar 4 /run/media/hank/98FEB92FFEB90692/}
+Dannie $alignc ${fs_used /run/media/hank/067EE25F7EE246D1/} / ${fs_size /run/media/hank/067EE25F7EE246D1/} $alignr ${fs_free_perc /run/media/hank/067EE25F7EE246D1/}%
+${fs_bar 4 /run/media/hank/067EE25F7EE246D1/}
+${color DimGray} ${stippled_hr 2}
+#=========================== Section Top Processes ===========================================
+#${font Arial:size=9:weight=bold}${color Tan1}TOP-5-MEMORY${color DarkSlateGray} ${hr 2}$color${font Arial:size=9}${color 778899}
+#NAME ${alignr}ID ${alignr}RAM
+#1. ${top_mem name 1} ${alignr}${top_mem pid 1} ${alignr}${top_mem mem 1}
+#2. ${top_mem name 2} ${alignr}${top_mem pid 2} ${alignr}${top_mem mem 2}
+#3. ${top_mem name 3} ${alignr}${top_mem pid 3} ${alignr}${top_mem mem 3}
+#4. ${top_mem name 4} ${alignr}${top_mem pid 4} ${alignr}${top_mem mem 4}
+#-------------------------------------------------------------------------- two variant top proces
+${font Arial:bold:size=10}${color Tan1}TOP PROCESSES:${color DarkSlateGray}${hr 2}$color${color 778899}
+$font${top_mem name 2}${alignr}${top mem 2} %
+$font${top_mem name 3}${alignr}${top mem 3} %
+$font${top_mem name 4}${alignr}${top mem 4} %
+$font${top_mem name 5}${alignr}${top mem 5} %
+$font${top_mem name 6}${alignr}${top mem 6} %
+$font${top_mem name 7}${alignr}${top mem 7} %
+${color DimGray} ${stippled_hr 2}
+#=========================== Section Network =================================================
+${font Arial:bold:size=10}${color Tan2}NETWORK ${color DarkSlateGray}${hr 2}
+$font${color 778899}IP on enp3s0 $alignr ${addr enp3s0}
+#
+Down $alignr ${downspeed enp3s0} kb/s
+Up $alignr ${upspeed enp3s0} kb/s
+#
+Downloaded: $alignr  ${totaldown enp3s0}
+Uploaded: $alignr  ${totalup enp3s0}
+#
+${downspeedgraph enp3s0 23,120 000000 778899} ${alignr}${upspeedgraph enp3s0 23,120 000000 778899}
+${color DimGray} ${stippled_hr 2}
+#============================== Section Time =================================================
+${font Arial:bold:size=10}${color Tan1}TIME ${color DarkSlateGray}${hr 2}
+${color 778899}${font univers condensed:size=30}${alignc}${time %H:%M:%S}
+${voffset -72}
+${font univers condensed:bold:size=15} ${alignc} ${time %d %b. %Y}
+${font arial:bold:size=11} $alignc${time %A}
+
+
