@@ -12,6 +12,12 @@ do
 	local test = 0
 	local cpu_model_name = ""
 	local cpu_cores = 0
+	local inet_ip4 = ""
+	local inet_interface = ""
+	local inet_rx_last = 0
+	local inet_tx_last = 0
+	local inet_rx_diff = 0
+	local inet_tx_diff = 0
 
 	-- debug function
 	function print_debug(message)
@@ -199,5 +205,101 @@ do
 --		return tostring(o)
 --		return #names
 		return rez
+	end
+
+	function init_inet()
+		local terminal_request = io.popen ("ip route list match default")
+		local terminal_respoce = terminal_request:read ("*a")
+		terminal_request:close ()
+
+		local net_record = string.split(terminal_respoce, " ")
+
+		for i = 1, #net_record do
+			if net_record[i] == "dev" then
+				inet_interface = net_record[i+1]
+				print_debug("inet_interface found " .. inet_interface)
+			end
+			if net_record[i] == "src" then
+				inet_ip4 = net_record[i+1]
+				print_debug("inet_ip4 found " .. inet_ip4)
+			end
+		end
+	end
+
+	function conky_inet_interface()
+		if (inet_interface == "") then
+			init_inet()
+		end
+
+		return inet_interface
+	end
+
+	function conky_inet_address()
+		if (inet_ip4 == "") then
+			init_inet()
+		end
+
+		return inet_ip4
+	end
+
+	function conky_inet_process_rates()
+		local terminal_request = io.popen ("ifstat " .. inet_interface .. " -j")
+		local terminal_respoce = terminal_request:read ("*a")
+		terminal_request:close ()
+
+		terminal_respoce = terminal_respoce:gsub(",\"", " ")
+		terminal_respoce = terminal_respoce:gsub("\":", " ")
+		local net_rates = string.split(terminal_respoce, " ")
+		print_debug(terminal_respoce)
+		local inet_rx = 0
+		local inet_tx = 0
+
+		for i = 1, #net_rates do
+			if net_rates[i] == "rx_bytes" then
+				inet_rx = net_rates[i+1]
+				print_debug("inet rx " .. inet_rx)
+			end
+			if net_rates[i] == "tx_bytes" then
+				inet_tx = net_rates[i+1]
+				print_debug("inet tx " .. inet_tx)
+			end
+		end
+
+		if (inet_rx_last == 0) then
+			inet_rx_diff = 0
+			inet_rx_last = inet_rx
+		else
+			inet_rx_diff = inet_rx - inet_rx_last
+			inet_rx_last = inet_rx
+		end
+
+		if (inet_tx_last == 0) then
+			inet_tx_diff = 0
+			inet_tx_last = inet_tx
+		else
+			inet_tx_diff = inet_tx - inet_tx_last
+			inet_tx_last = inet_tx
+		end
+
+		print_debug("inet rx diff " .. inet_rx_diff)
+		print_debug("inet tx diff " .. inet_tx_diff)
+
+		return ""
+	end
+
+	function conky_get_inet_download_rate_string()
+		return string.format("%.1f", inet_rx_diff/1024)
+	end
+
+	function conky_get_inet_upload_rate_string()
+		return string.format("%.1f", inet_tx_diff/1024)
+	end
+
+	function conky_get_inet_download_value()
+		return inet_rx_diff
+	end
+
+	function conky_get_inet_upload_value()
+		return inet_tx_diff
 	end
 end
