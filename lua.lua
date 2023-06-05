@@ -8,6 +8,80 @@
 do
 	-- configuration
 	local interval = 5
+	local debug_present = 1
+	local test = 0
+	local cpu_model_name = ""
+	local cpu_cores = 0
+
+	-- debug function
+	function print_debug(message)
+		if (debug_present == 1) then
+			print(message)
+		end
+	end
+
+	function init_cpu_model_name()
+		local terminal_request = io.popen ("cat /proc/cpuinfo | grep 'model name'")
+		local terminal_respoce = terminal_request:read ("*a")
+		terminal_request:close ()
+
+		local cpu_name_records = string.split(terminal_respoce, "\n")
+
+		-- we assume that we have 1 CPU
+		cpu_model_name = string.sub(cpu_name_records[1], 14)
+
+		print_debug("cpu name found " .. cpu_model_name)
+	end
+
+	function get_int_in_end_of_string(string)
+		return string:match("%d+$")
+	end
+
+	function init_cpu_cores_info()
+		local terminal_request = io.popen ("cat /proc/cpuinfo | grep 'cpu cores'")
+		local terminal_respoce = terminal_request:read ("*a")
+		terminal_request:close ()
+
+		local cpu_records = string.split(terminal_respoce, "\n")
+		for i = 1, #cpu_records-1 do
+			local cpu_cores_new_found = tonumber(get_int_in_end_of_string(cpu_records[i]))
+			if (cpu_cores < cpu_cores_new_found) then
+				cpu_cores = cpu_cores_new_found
+			end
+		end
+		print_debug("cpu cores found " .. cpu_cores)
+	end
+
+	function conky_cpu_section()
+		local result = ""
+
+		if (cpu_cores == 0) then
+			init_cpu_cores_info()
+		end
+
+		if (cpu_model_name == "") then
+			init_cpu_model_name()
+		end
+
+		result = "CPU cores " .. cpu_cores .. "${alignc -30}Package ${exec cat /sys/devices/platform/coretemp.0/hwmon/hwmon6/temp1_input | cut -c-2 }°C" .. "$alignr ${freq_g cpu0}Ghz\n"
+
+		for i = 1, cpu_cores do
+			result = result .. "${exec cat /sys/devices/platform/coretemp.0/hwmon/hwmon6/temp" .. i+1 .. "_input | cut -c-2 }" .. "°C" .. "${alignr 220}${cpu cpu" .. i .. "}" .. " ${goto 60}${cpubar cpu" .. i .. " 4}"
+			if i < cpu_cores then
+				result = result .. "\n"
+			end
+		end
+
+		return result
+	end
+
+	function conky_cpu_model_name()
+		if (cpu_model_name == "") then
+			init_cpu_model_name()
+		end
+
+		return cpu_model_name
+	end
 
 	-- local variables protected from the evil outside world
 	local next_update
@@ -95,7 +169,7 @@ do
 		local file = io.popen ("lsblk -l --output MOUNTPOINTS | grep /")
 		output = file:read ("*a")
 		file:close ()
-
+		
 		local disks = string.split(output, "\n")
 		local names = {}
 
