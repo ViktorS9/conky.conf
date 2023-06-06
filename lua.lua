@@ -18,6 +18,8 @@ do
 	local inet_tx_last = 0
 	local inet_rx_diff = 0
 	local inet_tx_diff = 0
+	local gpu_nvidia_model_name = ""
+	local gpu_intel_model_name = ""
 
 	-- debug function
 	function print_debug(message)
@@ -87,6 +89,50 @@ do
 		end
 
 		return cpu_model_name
+	end
+
+	function get_gpu_model_name()
+		local terminal_request = io.popen ("lspci -v | grep 'VGA controller'")
+		local terminal_respoce = terminal_request:read ("*a")
+		terminal_request:close ()
+
+		if (string.find(terminal_respoce, "Intel") ~= nil) then
+			print_debug("gpu found Intel")
+			gpu_intel_model_name = terminal_respoce
+			gpu_intel_model_name = gpu_intel_model_name:match(": [%a%s%d]+")
+			gpu_intel_model_name = gpu_intel_model_name:gsub(": Intel Corporation ", "")
+			gpu_intel_model_name = gpu_intel_model_name:match("^%s*(.-)%s*$")
+			print_debug("gpu Intel name " .. gpu_intel_model_name)
+		end
+
+		if (string.find(terminal_respoce, "NVIDIA") ~= nil) then
+			print_debug("gpu found NVIDIA")
+			gpu_nvidia_model_name = terminal_respoce
+			gpu_nvidia_model_name = gpu_nvidia_model_name:match(": [%a%s%d%[%]]+")
+			gpu_nvidia_model_name = gpu_nvidia_model_name:match("%[.+%]")
+			gpu_nvidia_model_name = gpu_nvidia_model_name:match("[%a%s%d]+")
+			print_debug("gpu NVIDIA name " .. gpu_nvidia_model_name)
+		end
+
+		local gpu_records = string.split(terminal_respoce, "\n")
+	end
+
+	function conky_gpu_section()
+		local result = ""
+
+		if (gpu_nvidia_model_name == "") and (gpu_intel_model_name == "") then
+			get_gpu_model_name()
+		end
+
+		if (gpu_nvidia_model_name ~= "") then
+			result = gpu_nvidia_model_name .. "${alignr}Temp ${nvidia temp}°C\n" .. "GPU freq ${nvidia gpufreq}MHz${alignr}MEM freq ${nvidia memfreq}MHz"
+		end
+
+		if (gpu_intel_model_name ~= "") then
+			result = gpu_intel_model_name
+		end
+
+		return result
 	end
 
 	-- local variables protected from the evil outside world
