@@ -12,6 +12,8 @@ do
 	local test = 0
 	local cpu_model_name = ""
 	local cpu_cores = 0
+	local cpu_hwmon_name = ""
+	local cpu_pack_temp = false
 	local inet_ip4 = ""
 	local inet_interface = ""
 	local inet_rx_last = 0
@@ -62,6 +64,29 @@ do
 		print_debug("cpu cores found " .. cpu_cores)
 	end
 
+	function init_cpu_pack_temp()
+		local terminal_request = io.popen ("cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp1_input")
+		local terminal_respoce = terminal_request:read ("*a")
+		terminal_request:close ()
+
+		if (#terminal_respoce ~= 0) then
+			cpu_pack_temp = true
+		else
+			cpu_pack_temp = false
+		end
+	end
+
+	function init_cpu_hwmon_name()
+		local terminal_request = io.popen ("ls /sys/devices/platform/coretemp.0/hwmon")
+		local terminal_respoce = terminal_request:read ("*a")
+		terminal_request:close ()
+
+		cpu_hwmon_name = terminal_respoce:sub(1, 6) -- trim "\n" at end of string
+		print_debug("cpu_hwmon_name = " .. cpu_hwmon_name)
+
+		init_cpu_pack_temp()
+	end
+
 	function conky_cpu_section()
 		local result = ""
 
@@ -69,14 +94,24 @@ do
 			init_cpu_cores_info()
 		end
 
+		if (cpu_hwmon_name == "") then
+			init_cpu_hwmon_name()
+		end
+
 		if (cpu_model_name == "") then
 			init_cpu_model_name()
 		end
 
-		result = "CPU cores " .. cpu_cores .. "${alignc -30}Package ${exec cat /sys/devices/platform/coretemp.0/hwmon/hwmon6/temp1_input | cut -c-2 }°C" .. "$alignr ${freq_g cpu0}Ghz\n"
+		result = "CPU cores " .. cpu_cores
+
+		if (cpu_pack_temp == true) then
+			result = result .. "${alignc -30}Package ${exec cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp1_input | cut -c-2 }°C"
+		end
+
+		result = result .. "$alignr ${freq_g cpu0}Ghz\n"
 
 		for i = 1, cpu_cores do
-			result = result .. "${exec cat /sys/devices/platform/coretemp.0/hwmon/hwmon6/temp" .. i+1 .. "_input | cut -c-2 }" .. "°C" .. "${alignr 220}${cpu cpu" .. i .. "}" .. " ${goto 60}${cpubar cpu" .. i .. " 4}"
+			result = result .. "${exec cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp" .. i+1 .. "_input | cut -c-2 }" .. "°C" .. "${alignr 210}${cpu cpu" .. i .. "}%" .. "${goto 70}${cpubar cpu" .. i .. " 4}"
 			if i < cpu_cores then
 				result = result .. "\n"
 			end
