@@ -20,6 +20,8 @@ do
 	local inet_tx_diff = 0
 	local gpu_nvidia_model_name = ""
 	local gpu_intel_model_name = ""
+	local disk_cached_output = ""
+	local disk_request_checksum = 0
 
 	-- debug function
 	function print_debug(message)
@@ -217,40 +219,166 @@ do
 	      return file:match("([^/]+)$")
 	end
 
-	function conky_disk_info()
-		local file = io.popen ("lsblk -l --output MOUNTPOINTS | grep /")
-		output = file:read ("*a")
-		file:close ()
-		
-		local disks = string.split(output, "\n")
-		local names = {}
+	function get_string_check_sum(str)
+		local checksum = 0
+		for i = 1, #str do
+			checksum = checksum + string.byte(str, i)
+		end
+		return checksum
+	end
 
-		for i = 1, #disks-1 do
-			if disks[i] == "/" then
-				names[i] = "root"
+	function disk_temp(disk_kname)
+		if string.find(disk_kname, "nvme") ~= nil then
+			return "${exec cat /sys/block/" .. disk_kname .. "/device/hwmon3/temp1_input | cut -c-2 }"
+		end
+		return "--"
+	end
+
+	function formatting_name(str, delim, max_len)
+		if (string.find(str, delim) ~= nil) then
+			-- multiple words
+			local mp = string.split(str, delim)
+
+			if (#mp[#mp] > max_len-2) then
+				local diff_len = #mp[#mp] - (max_len-2)
+				if diff_len == 1 then
+					return "…" .. string.sub(mp[#mp], 1, max_len-1)
+				else
+					return "…" .. string.sub(mp[#mp], 1, max_len-2) .. "…"
+				end
 			else
-				names[i] = get_file_name(disks[i])
+				local diff_len = max_len - #mp[#mp]
+
+				if (#mp[1] > diff_len-1) then
+					return string.sub(mp[1], 1, diff_len-1) .. "…" .. mp[#mp]
+				else
+					if (#mp == 2) then
+						return mp[1] .. " " .. mp[#mp]
+					else
+						return mp[1] .. "…" .. mp[#mp]
+					end
+				end
+			end
+		else
+			-- one word, if word is long cut off the end
+			if (#str > max_len) then
+				return string.sub(str, 1, max_len-1) .. "…"
+			else
+				return str
 			end
 		end
+	end
 
-		local rez = ""
-
-		for i = 1, #names do
-			rez = rez .. "$font${color 778899}" .. names[i] .. "(${fs_type " .. disks[i] .. "}) $alignr ${fs_used " .. disks[i] .. "} / ${fs_size " .. disks[i] .. "}    ${fs_free_perc " .. disks[i] .. "}%" .. "\n"
-			if i == #names then
-				rez = rez .. "${fs_bar 4 " .. disks[i] .. "}"
+	function part_formatting_name(str, delim, max_len)
+		if (string.find(str, delim) ~= nil) then
+			local mp = string.split(str, delim)
+			for i = 1, #mp do
+				if (str == "/") then
+					mp[i] = "root"
+				end
+			end
+			return formatting_name(str, delim, max_len)
+		else
+			if (str == "/") then
+				return "root"
 			else
-				rez = rez .. "${fs_bar 4 " .. disks[i] .. "}" .. "\n"
+				return formatting_name(get_file_name(str), "/", max_len)
+			end
+		end
+	end
+
+	function conky_disk_info()				--    1    2    3           4     5     6    7      8
+		local terminal_request = io.popen ("lsblk -M -n -r -o NAME,TYPE,MOUNTPOINTS,KNAME,LABEL,PATH,PKNAME,MODEL")
+		local terminal_respoce = terminal_request:read ("*a")
+		terminal_request:close ()
+
+		local new_check_sum = get_string_check_sum(terminal_respoce)
+		if new_check_sum == disk_request_checksum then
+			return disk_cached_output
+		end
+		disk_request_checksum = new_check_sum
+
+		local blk_records = string.split(terminal_respoce, "\n")
+		local disk_record_added = false
+		local disk_record = ""
+		local first_disk = true
+
+		disk_cached_output = ""
+
+		for i = 1, #blk_records do
+			local sp_record = string.split(blk_records[i], " ")
+
+			if (#sp_record == 1) then
+				goto skip_record
 			end
 
+			if (sp_record[2] == "disk") or (sp_record[2] == "raid0") then
+				print_debug("disk record formatting")
+				local disk_name = ""
+
+				if (sp_record[8] ~= nil) and (sp_record[8] ~= "") then
+					disk_name = formatting_name(sp_record[8], "\\x20", 12)
+				else
+					disk_name = formatting_name(sp_record[4], " ", 12)
+				end
+
+				disk_record = "• " .. disk_name
+				.. "${goto 120}R:${diskio_read " .. sp_record[6] .. "}"
+				.. "${goto 185}W:${diskio_write " .. sp_record[6] .. "}"
+
+				local disk_temp_record = disk_temp(sp_record[4])
+				if (disk_temp_record ~= "--") then
+					disk_record = disk_record .. "${alignr} " .. disk_temp(sp_record[4]) .. "°C" .. "\n"
+				else
+					disk_record = disk_record .. "\n"
+				end
+
+				disk_record_added = false
+			end
+
+			if (sp_record[2] == "part") or (sp_record[3] ~= "") then
+				print_debug("part record formatting")
+				local part_name = ""
+
+				if (sp_record[3] == "[SWAP]") or (sp_record[3] == "/boot/efi") or (sp_record[3] == "") then
+					goto skip_record
+				end
+
+				if first_disk == true then
+					first_disk = false
+				else
+					disk_cached_output = disk_cached_output .. "\n"
+				end
+
+				if disk_record_added == false then
+					disk_cached_output = disk_cached_output .. disk_record
+					disk_record_added = true
+				end
+
+				-- get one of multiple mount points
+				if (string.find(sp_record[3], "\\x0a") ~= nil) then
+					local mp = string.split(sp_record[3], "\\x0a")
+					sp_record[3] = mp[#mp]
+				end
+
+				-- formatting part name
+				if (sp_record[5] ~= nil) and (sp_record[5] ~= "") then
+					part_name = part_formatting_name(sp_record[5], " ", 15)
+				else
+					part_name = part_formatting_name(sp_record[3], "\\x0a", 15)
+				end
+
+				disk_cached_output = disk_cached_output .. "" ..
+				"$font${color 778899}" .. part_name ..
+				"(${fs_type " .. sp_record[3] .. "}) $alignr ${fs_used " .. sp_record[3]
+				.. "} / ${fs_size " .. sp_record[3] .. "}    ${fs_free_perc " .. sp_record[3] .. "}%" .. "\n"
+				.. "${fs_bar 4 " .. sp_record[3] .. "}"
+
+			end
+			::skip_record::
 		end
 
-		-- return string.format("${color #%06x}time ", colour%0xffffff) .. tostring(buf) .. "${color}"
---		return "${color Tan1}" .. tostring(buf) .. "${color}"
---		return get_file_name(disks[3])
---		return tostring(o)
---		return #names
-		return rez
+		return disk_cached_output
 	end
 
 	function init_inet()
