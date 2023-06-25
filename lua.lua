@@ -1,15 +1,7 @@
--- Conky Lua scripting example
---
--- In your conkyrc, use ${lua string_func} to call conky_string_func(), ${lua
--- int_func} to call conky_int_func(), and so forth.  You must load this script
--- in your conkyrc using 'lua_load <path>' before TEXT in order to call the
--- function.
---
+-- Conky Lua script
 do
 	-- configuration
-	local interval = 5
-	local debug_present = 1
-	local test = 0
+	local debug_present = 0
 	local cpu_model_name = ""
 	local cpu_cores = 0
 	local cpu_hwmon_name = ""
@@ -32,12 +24,16 @@ do
 		end
 	end
 
-	function init_cpu_model_name()
-		local terminal_request = io.popen ("cat /proc/cpuinfo | grep 'model name'")
+	function execute_in_terminal(request)
+		local terminal_request = io.popen(request)
 		local terminal_respoce = terminal_request:read ("*a")
 		terminal_request:close ()
+		return terminal_respoce
+	end
 
-		local cpu_name_records = string.split(terminal_respoce, "\n")
+	function init_cpu_model_name()
+		local command_result = execute_in_terminal("cat /proc/cpuinfo | grep 'model name'")
+		local cpu_name_records = string.split(command_result, "\n")
 
 		-- we assume that we have 1 CPU
 		cpu_model_name = string.sub(cpu_name_records[1], 14)
@@ -50,11 +46,9 @@ do
 	end
 
 	function init_cpu_cores_info()
-		local terminal_request = io.popen ("cat /proc/cpuinfo | grep 'cpu cores'")
-		local terminal_respoce = terminal_request:read ("*a")
-		terminal_request:close ()
+		local command_result = execute_in_terminal("cat /proc/cpuinfo | grep 'cpu cores'")
 
-		local cpu_records = string.split(terminal_respoce, "\n")
+		local cpu_records = string.split(command_result, "\n")
 		for i = 1, #cpu_records-1 do
 			local cpu_cores_new_found = tonumber(get_int_in_end_of_string(cpu_records[i]))
 			if (cpu_cores < cpu_cores_new_found) then
@@ -65,11 +59,9 @@ do
 	end
 
 	function init_cpu_pack_temp()
-		local terminal_request = io.popen ("cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp1_input")
-		local terminal_respoce = terminal_request:read ("*a")
-		terminal_request:close ()
+		local command_result = execute_in_terminal("cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp1_input")
 
-		if (#terminal_respoce ~= 0) then
+		if (#command_result ~= 0) then
 			cpu_pack_temp = true
 		else
 			cpu_pack_temp = false
@@ -77,11 +69,9 @@ do
 	end
 
 	function init_cpu_hwmon_name()
-		local terminal_request = io.popen ("ls /sys/devices/platform/coretemp.0/hwmon")
-		local terminal_respoce = terminal_request:read ("*a")
-		terminal_request:close ()
+		local command_result = execute_in_terminal("ls /sys/devices/platform/coretemp.0/hwmon")
 
-		cpu_hwmon_name = terminal_respoce:sub(1, 6) -- trim "\n" at end of string
+		cpu_hwmon_name = command_result:sub(1, 6) -- trim "\n" at end of string
 		print_debug("cpu_hwmon_name = " .. cpu_hwmon_name)
 
 		init_cpu_pack_temp()
@@ -129,29 +119,26 @@ do
 	end
 
 	function get_gpu_model_name()
-		local terminal_request = io.popen ("lspci -v | grep 'VGA controller'")
-		local terminal_respoce = terminal_request:read ("*a")
-		terminal_request:close ()
+		local command_result = execute_in_terminal("lspci -v | grep 'VGA controller'")
 
-		if (string.find(terminal_respoce, "Intel") ~= nil) then
+		if (string.find(command_result, "Intel") ~= nil) then
 			print_debug("gpu found Intel")
-			gpu_intel_model_name = terminal_respoce
+			gpu_intel_model_name = command_result
 			gpu_intel_model_name = gpu_intel_model_name:match(": [%a%s%d]+")
 			gpu_intel_model_name = gpu_intel_model_name:gsub(": Intel Corporation ", "")
 			gpu_intel_model_name = gpu_intel_model_name:match("^%s*(.-)%s*$")
 			print_debug("gpu Intel name " .. gpu_intel_model_name)
 		end
 
-		if (string.find(terminal_respoce, "NVIDIA") ~= nil) then
+		if (string.find(command_result, "NVIDIA") ~= nil) then
 			print_debug("gpu found NVIDIA")
-			gpu_nvidia_model_name = terminal_respoce
+			gpu_nvidia_model_name = command_result
 			gpu_nvidia_model_name = gpu_nvidia_model_name:match(": [%a%s%d%[%]]+")
 			gpu_nvidia_model_name = gpu_nvidia_model_name:match("%[.+%]")
 			gpu_nvidia_model_name = gpu_nvidia_model_name:match("[%a%s%d]+")
 			print_debug("gpu NVIDIA name " .. gpu_nvidia_model_name)
 		end
 
-		local gpu_records = string.split(terminal_respoce, "\n")
 	end
 
 	function conky_gpu_section()
@@ -172,85 +159,20 @@ do
 		return result
 	end
 
-	-- local variables protected from the evil outside world
-	local next_update
-	local buf
-	local int = 0
-	local colour = 0
-	local function update_buf()
-		buf = os.time()
-	end
-
-
-	function string:split (delimiter)
+	function string:split(delimiter)
 		local result = {}
 		local from = 1
-		local delim_from, delim_to = string.find (self, delimiter, from)
+		local delim_from, delim_to = string.find(self, delimiter, from)
 		while delim_from do
-			table.insert (result, string.sub (self, from , delim_from - 1))
+			table.insert(result, string.sub(self, from , delim_from - 1))
 			from = delim_to + 1
-			delim_from, delim_to = string.find (self, delimiter, from)
+			delim_from, delim_to = string.find(self, delimiter, from)
 		end
-		table.insert ( result, string.sub (self, from))
+		table.insert(result, string.sub(self, from))
 		return result
 	end
 
-
-	-- a function that returns the time with some special effects using a 5
-	-- second interval
-	function conky_string_func()
-		local now = os.time()
-
-		if next_update == nil or now >= next_update then
-			update_buf();
-			next_update = now + interval
-		end
-		colour = colour + 11100
-
-		return string.format("${color #%06x}The time is now ", colour%0xffffff) .. tostring(buf) .. "${color}"
-	end
-
-	-- this function changes Conky's top colour based on a threshold
-	function conky_top_colour(value, default_colour, upper_thresh, lower_thresh)
-		local r, g, b = default_colour, default_colour, default_colour
-		local colour = 0
-		-- in my case, there are 4 CPUs so a typical high value starts at around ~20%, and 25% is one thread/process maxed out
-		local thresh_diff = upper_thresh - lower_thresh
-		if (value - lower_thresh) > 0 then
-			if value > upper_thresh then value = upper_thresh end
-			-- add some redness, depending on the 'strength'
-			r = math.ceil(default_colour + ((value - lower_thresh) / thresh_diff) * (0xff - default_colour))
-			b = math.floor(default_colour - ((value - lower_thresh) / thresh_diff) * default_colour)
-			g = b
-		end
-		colour = (r * 0x10000) + (g * 0x100) + b -- no bit shifting operator in Lua afaik
-
-		return string.format("${color #%06x}", colour%0xffffff)
-	end
-	-- parses the output from top and calls the colour function
-	function conky_top_cpu_colour(arg)
-		-- input is ' ${top name 1} ${top pid 1} ${top cpu 1} ${top mem 1}'
-		local cpu = tonumber(string.match(arg, '(%d+%.%d+)'))
-		-- tweak the last 3 parameters to your liking
-		-- my machine has 4 CPUs, so an upper thresh of 25% is appropriate
-		return conky_top_colour(cpu, 0xd3, 25, 15) .. arg
-	end
-	function conky_top_mem_colour(arg)
-		-- input is '${top_mem name 1} ${top_mem pid 1} ${top_mem cpu 1} ${top_mem mem 1}'
-		local mem = tonumber(string.match(arg, '%d+%.%d+%s+(%d+%.%d+)'))
-		-- tweak the last 3 parameters to your liking
-		-- my machine has 8GiB of ram, so an upper thresh of 15% is appropriate
-		return conky_top_colour(mem, 0xd3, 15, 5) .. arg
-	end
-
-	-- returns a percentage value that loops around
-	function conky_int_func()
-		int = int + 1
-		return int % 100
-	end
-
 	function get_file_name(file)
---	      return file:match("[^\/]*$")
 	      return file:match("([^/]+)$")
 	end
 
@@ -322,18 +244,16 @@ do
 		end
 	end
 
-	function conky_disk_info()				--    1    2    3           4     5     6    7      8
-		local terminal_request = io.popen ("lsblk -M -n -r -o NAME,TYPE,MOUNTPOINTS,KNAME,LABEL,PATH,PKNAME,MODEL")
-		local terminal_respoce = terminal_request:read ("*a")
-		terminal_request:close ()
+	function conky_disk_info()					--    1    2    3           4     5     6    7      8
+		local command_result = execute_in_terminal("lsblk -M -n -r -o NAME,TYPE,MOUNTPOINTS,KNAME,LABEL,PATH,PKNAME,MODEL")
 
-		local new_check_sum = get_string_check_sum(terminal_respoce)
+		local new_check_sum = get_string_check_sum(command_result)
 		if new_check_sum == disk_request_checksum then
 			return disk_cached_output
 		end
 		disk_request_checksum = new_check_sum
 
-		local blk_records = string.split(terminal_respoce, "\n")
+		local blk_records = string.split(command_result, "\n")
 		local disk_record_added = false
 		local disk_record = ""
 		local first_disk = true
@@ -417,11 +337,9 @@ do
 	end
 
 	function init_inet()
-		local terminal_request = io.popen ("ip route list match default")
-		local terminal_respoce = terminal_request:read ("*a")
-		terminal_request:close ()
+		local command_result = execute_in_terminal("ip route list match default")
 
-		local net_record = string.split(terminal_respoce, " ")
+		local net_record = string.split(command_result, " ")
 
 		for i = 1, #net_record do
 			if net_record[i] == "dev" then
@@ -452,14 +370,13 @@ do
 	end
 
 	function conky_inet_process_rates()
-		local terminal_request = io.popen ("ifstat " .. inet_interface .. " -j")
-		local terminal_respoce = terminal_request:read ("*a")
-		terminal_request:close ()
+		local command_result = execute_in_terminal("ifstat " .. inet_interface .. " -j")
 
-		terminal_respoce = terminal_respoce:gsub(",\"", " ")
-		terminal_respoce = terminal_respoce:gsub("\":", " ")
-		local net_rates = string.split(terminal_respoce, " ")
-		print_debug(terminal_respoce)
+		command_result = command_result:gsub(",\"", " ")
+		command_result = command_result:gsub("\":", " ")
+
+		local net_rates = string.split(command_result, " ")
+
 		local inet_rx = 0
 		local inet_tx = 0
 
