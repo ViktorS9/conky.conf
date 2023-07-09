@@ -12,8 +12,10 @@ do
 	local debug_present = 0
 	local cpu_model_name = ""
 	local cpu_cores = 0
+	local cpu_cores_processor = {}
 	local cpu_hwmon_name = ""
 	local cpu_pack_temp = false
+	local cpu_section_cache = ""
 	local inet_ip4 = ""
 	local inet_interface = ""
 	local inet_rx_last = 0
@@ -64,6 +66,26 @@ do
 			end
 		end
 		print_debug("cpu cores found " .. cpu_cores)
+
+		command_result = execute_in_terminal("cat /proc/cpuinfo | grep -e 'core id' -e 'processor'")
+
+		for i = 1, cpu_cores do
+			cpu_cores_processor[i] = {}
+		end
+
+		local cpu_core_processor_records = string.split(command_result, "\n")
+		local processor_number = 0
+		for i = 1, #cpu_core_processor_records-1 do
+			if cpu_core_processor_records[i]:find("processor") then
+				processor_number = tonumber(get_int_in_end_of_string(cpu_core_processor_records[i]))
+			end
+
+			if cpu_core_processor_records[i]:find("core id") then
+				local core_id = tonumber(get_int_in_end_of_string(cpu_core_processor_records[i])) + 1
+				local processor_n = #cpu_cores_processor[core_id] + 1
+				cpu_cores_processor[core_id][processor_n] = processor_number
+			end
+		end
 	end
 
 	function init_cpu_pack_temp()
@@ -88,6 +110,10 @@ do
 	function conky_cpu_section()
 		local result = ""
 
+		if (cpu_section_cache ~= "") then
+			return cpu_section_cache
+		end
+
 		if (cpu_cores == 0) then
 			init_cpu_cores_info()
 		end
@@ -108,14 +134,19 @@ do
 
 		result = result .. "$alignr ${freq_g cpu0}Ghz\n"
 
-		for i = 1, cpu_cores do
-			result = result .. "${exec cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp" .. i+1 .. "_input | cut -c-2 }" .. "°C" .. "${alignr 210}${cpu cpu" .. i .. "}%" .. "${goto 70}${cpubar cpu" .. i .. " 4}"
-			if i < cpu_cores then
-				result = result .. "\n"
+		for i = 1, #cpu_cores_processor do
+			result = result .. "${exec cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp" .. i+1 .. "_input | cut -c-2 }" .. "°C"
+			for j = 1, #cpu_cores_processor[i] do
+				result = result .. "${alignr 210}${cpu cpu" .. cpu_cores_processor[i][j] .. "}%" .. "${goto 70}${cpubar cpu" .. cpu_cores_processor[i][j] .. " 4}"
+				if (i ~= #cpu_cores_processor) or (j ~= #cpu_cores_processor[i]) then
+					result = result .. "\n"
+				end
 			end
 		end
 
-		return result
+		cpu_section_cache = result
+
+		return cpu_section_cache
 	end
 
 	function conky_cpu_model_name()
