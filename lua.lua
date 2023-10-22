@@ -149,7 +149,9 @@ do
 		result = result .. "$alignr ${freq_g cpu0}Ghz\n"
 
 		for i = 1, #cpu_cores_processor do
-			result = result .. "${exec cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp" .. i+1 .. "_input | cut -c-2 }" .. "°C"
+			if (cpu_hwmon_name ~= "") then
+				result = result .. "${exec cat /sys/devices/platform/coretemp.0/hwmon/" .. cpu_hwmon_name .. "/temp" .. i+1 .. "_input | cut -c-2 }" .. "°C"
+			end
 			for j = 1, #cpu_cores_processor[i] do
 				local cpu_processor_conky_index = cpu_cores_processor[i][j] + 1     -- +1 because cpu0 for all cpu
 				result = result .. "${alignr 210}${cpu cpu" .. cpu_processor_conky_index .. "}%" .. "${goto 70}${cpubar cpu" .. cpu_processor_conky_index .. " 4}"
