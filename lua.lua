@@ -451,16 +451,24 @@ do
 			inet_rx_diff = 0
 			inet_rx_last = inet_rx
 		else
-			inet_rx_diff = inet_rx - inet_rx_last
-			inet_rx_last = inet_rx
+			if (inet_rx == 0) then
+				inet_rx_diff = inet_rx
+			else
+				inet_rx_diff = inet_rx - inet_rx_last
+				inet_rx_last = inet_rx
+			end
 		end
 
 		if (inet_tx_last == 0) then
 			inet_tx_diff = 0
 			inet_tx_last = inet_tx
 		else
-			inet_tx_diff = inet_tx - inet_tx_last
-			inet_tx_last = inet_tx
+			if (inet_tx = 0) then
+				inet_tx_diff = inet_tx
+			else
+				inet_tx_diff = inet_tx - inet_tx_last
+				inet_tx_last = inet_tx
+			end
 		end
 
 		print_debug("inet rx diff " .. inet_rx_diff)
