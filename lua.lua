@@ -10,6 +10,7 @@
 do
 	-- configuration
 	local debug_present = 0
+	local log_to_file = 0
 	local cpu_model_name = ""
 	local cpu_cores = 0
 	local cpu_cores_processor = {}
@@ -31,6 +32,19 @@ do
 	function print_debug(message)
 		if (debug_present == 1) then
 			print(message)
+		end
+	end
+
+	function file_log(message)
+		if (log_to_file == 1) then
+			local log_file = nil
+			log_file = io.open("/tmp/concy_conf_lua_log.log", "a+")
+			if (log_file ~= nil) then
+				io.output(log_file)
+				io.write(message .. "\r\n")
+				io.close(log_file)
+				log_file = nil
+			end
 		end
 	end
 
